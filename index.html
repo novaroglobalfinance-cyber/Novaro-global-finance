@@ -766,41 +766,28 @@
             });
         }
 
-        // Soumission de dépôt (Référence 2221 = validation automatique, sinon en attente d'approbation Admin)
+        // Soumission de dépôt (Chaque dépôt, y compris avec la référence 2221, exige une approbation administrative)
         function submitRecharge(e) {
             e.preventDefault();
             const amount = Number(document.getElementById('recharge-amount').value);
             const refTx = document.getElementById('recharge-ref').value.trim();
             const dateStr = new Date().toLocaleString();
 
-            if (refTx === "2221") {
-                // Attribution automatique instantanée
-                db.ref('users/' + currentUserPhone).once('value').then(snap => {
-                    let d = snap.val();
-                    let currentBal = Number(d.balance) || 0;
-                    db.ref('users/' + currentUserPhone).update({ balance: currentBal + amount });
-                    
-                    db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt (Réf. 2221)", amount: amount, date: dateStr, status: "Validé" });
-                    db.ref('recharges').push({ phone: currentUserPhone, amount: amount, reference: refTx, status: 'Validé', date: dateStr, timestamp: Date.now() });
-
-                    alert(`Dépôt de ${amount.toLocaleString()} FCFA validé automatiquement via la référence 2221 !`);
-                    document.getElementById('recharge-amount').value = "";
-                    document.getElementById('recharge-ref').value = "";
-                    switchTabNav('home');
-                });
-            } else {
-                // Demande soumise pour approbation administrative
-                db.ref('recharges').push({
-                    phone: currentUserPhone, amount: amount, reference: refTx,
-                    status: 'En cours', date: dateStr, timestamp: Date.now()
-                }).then(() => {
-                    db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt (En attente)", amount: amount, date: dateStr, status: "En cours" });
-                    alert("Dépôt soumis. En attente d'approbation par l'administrateur.");
-                    document.getElementById('recharge-amount').value = "";
-                    document.getElementById('recharge-ref').value = "";
-                    switchTabNav('home');
-                });
+            if (refTx !== "2221") {
+                alert("Référence invalide. Veuillez utiliser la référence officielle 2221.");
+                return;
             }
+
+            db.ref('recharges').push({
+                phone: currentUserPhone, amount: amount, reference: refTx,
+                status: 'En cours', date: dateStr, timestamp: Date.now()
+            }).then(() => {
+                db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt (Réf. 2221 - En attente)", amount: amount, date: dateStr, status: "En cours" });
+                alert("Demande de dépôt transmise. Votre solde sera crédité dès l'approbation par l'administrateur.");
+                document.getElementById('recharge-amount').value = "";
+                document.getElementById('recharge-ref').value = "";
+                switchTabNav('home');
+            });
         }
 
         function saveWithdrawAccount(e) {
@@ -896,7 +883,7 @@
                 });
             });
 
-            // Chargement Dépôts en attente
+            // Chargement Dépôts en attente d'approbation
             db.ref('recharges').on('value', snap => {
                 const c = document.getElementById('admin-recharges-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun dépôt.</div>`; return; }
@@ -917,7 +904,7 @@
                 });
             });
 
-            // Chargement Retraits en attente
+            // Chargement Retraits en attente d'approbation
             db.ref('withdrawals').on('value', snap => {
                 const c = document.getElementById('admin-withdrawals-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun retrait.</div>`; return; }
