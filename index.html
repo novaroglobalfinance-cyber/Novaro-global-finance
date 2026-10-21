@@ -356,8 +356,8 @@
             </div>
 
             <div id="admin-content-users" class="space-y-3">
-                <div class="text-xs text-emerald-400 font-bold">Liste des comptes et portefeuilles</div>
-                <div id="admin-users-list" class="space-y-2"></div>
+                <div class="text-xs text-emerald-400 font-bold">Gestion des Comptes & Portefeuilles</div>
+                <div id="admin-users-list" class="space-y-3"></div>
             </div>
 
             <div id="admin-content-recharges" class="space-y-3 hidden">
@@ -414,7 +414,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Fonction automatique pour nettoyer la base au premier lancement (Efface tout Geneva)
         function cleanOldGenevaDatabaseOnce() {
             if (!localStorage.getItem('novaro_db_cleaned')) {
                 db.ref().set({
@@ -766,7 +765,6 @@
             });
         }
 
-        // Soumission de dépôt (Chaque dépôt, y compris avec la référence 2221, exige une approbation administrative)
         function submitRecharge(e) {
             e.preventDefault();
             const amount = Number(document.getElementById('recharge-amount').value);
@@ -868,22 +866,55 @@
         }
 
         function loadAdminData() {
-            // Chargement Investisseurs
+            // Chargement Investisseurs avec gestion mot de passe, packs, blocage & suppression
             db.ref('users').on('value', snap => {
                 const c = document.getElementById('admin-users-list'); c.innerHTML = "";
                 if (!snap.exists()) return;
                 snap.forEach(cs => {
                     let p = cs.key, d = cs.val();
+                    let packsHtml = "";
+                    if (d.activePacks) {
+                        Object.values(d.activePacks).forEach(pack => {
+                            packsHtml += `<div class="text-[10px] text-emerald-400 font-semibold">• ${pack.name} (${pack.daysClaimed || 0}/${pack.duration}j) ${pack.completed ? '[Expiré]' : '[Actif]'}</div>`;
+                        });
+                    } else {
+                        packsHtml = `<div class="text-[10px] text-gray-500 font-semibold">Aucun pack VIP</div>`;
+                    }
+
+                    let blockBtnText = d.isBlocked ? "Débloquer" : "Bloquer";
+                    let blockBtnClass = d.isBlocked ? "bg-amber-500/20 text-amber-400" : "bg-yellow-500/20 text-yellow-400";
+                    let statusTag = d.isBlocked ? `<span class="text-red-400 font-bold ml-1">[Bloqué]</span>` : "";
+
                     c.innerHTML += `
-                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3 text-xs space-y-1">
-                            <div class="flex justify-between"><b class="text-emerald-400">${p}</b><span>Solde : <b>${(Number(d.balance)||0).toLocaleString()}f</b></span></div>
-                            <div class="text-[10px] text-gray-400">Filleuls L1: ${d.team?.l1 ? Object.keys(d.team.l1).length : 0}</div>
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3.5 text-xs space-y-2">
+                            <div class="flex justify-between items-center">
+                                <div><b class="text-emerald-400 text-sm">${p}</b> ${statusTag}</div>
+                                <span class="text-white font-bold">Solde : ${(Number(d.balance)||0).toLocaleString()} FCFA</span>
+                            </div>
+
+                            <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
+                                <div class="text-[11px] text-gray-300">Pass : <b class="text-white font-mono">${d.pass || '---'}</b></div>
+                                <button onclick="adminChangePassword('${p}')" class="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/20">Modifier</button>
+                            </div>
+
+                            <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800 space-y-1">
+                                <div class="text-[10px] text-gray-400 uppercase font-bold">Packs VIP souscrits :</div>
+                                ${packsHtml}
+                            </div>
+
+                            <div class="flex justify-between items-center text-[10px] text-gray-400 pt-1">
+                                <span>Filleuls L1: ${d.team?.l1 ? Object.keys(d.team.l1).length : 0}</span>
+                                <div class="flex space-x-2">
+                                    <button onclick="adminToggleBlock('${p}', ${d.isBlocked || false})" class="${blockBtnClass} font-bold px-2.5 py-1 rounded-lg">${blockBtnText}</button>
+                                    ${p !== '64497030' ? `<button onclick="adminDeleteUser('${p}')" class="bg-red-500/20 text-red-400 font-bold px-2.5 py-1 rounded-lg">Supprimer</button>` : ''}
+                                </div>
+                            </div>
                         </div>
                     `;
                 });
             });
 
-            // Chargement Dépôts en attente d'approbation
+            // Chargement Dépôts en attente
             db.ref('recharges').on('value', snap => {
                 const c = document.getElementById('admin-recharges-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun dépôt.</div>`; return; }
@@ -904,7 +935,7 @@
                 });
             });
 
-            // Chargement Retraits en attente d'approbation
+            // Chargement Retraits en attente
             db.ref('withdrawals').on('value', snap => {
                 const c = document.getElementById('admin-withdrawals-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun retrait.</div>`; return; }
@@ -926,7 +957,37 @@
             });
         }
 
-        // Action Admin : Approuver un dépôt
+        // Modifier le mot de passe d'un utilisateur depuis l'Admin
+        function adminChangePassword(phone) {
+            let newPass = prompt(`Entrez le nouveau mot de passe pour le compte ${phone} :`);
+            if (newPass && newPass.trim() !== "") {
+                db.ref('users/' + phone).update({ pass: newPass.trim() }).then(() => {
+                    alert(`Mot de passe mis à jour pour ${phone} !`);
+                });
+            }
+        }
+
+        // Bloquer ou Débloquer un utilisateur
+        function adminToggleBlock(phone, isCurrentlyBlocked) {
+            db.ref('users/' + phone).update({ isBlocked: !isCurrentlyBlocked }).then(() => {
+                alert(`Compte ${phone} ${!isCurrentlyBlocked ? 'bloqué' : 'débloqué'} !`);
+            });
+        }
+
+        // Supprimer définitivement un utilisateur
+        function adminDeleteUser(phone) {
+            if (phone === "64497030") {
+                alert("Impossible de supprimer le compte administrateur principal.");
+                return;
+            }
+            if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement l'utilisateur ${phone} ?`)) {
+                db.ref('users/' + phone).remove().then(() => {
+                    db.ref('transactions/' + phone).remove();
+                    alert(`Utilisateur ${phone} supprimé définitivement.`);
+                });
+            }
+        }
+
         function adminApproveRecharge(key, phone, amount) {
             db.ref('users/' + phone).once('value').then(snap => {
                 let currentBal = Number(snap.val()?.balance) || 0;
@@ -937,19 +998,16 @@
             });
         }
 
-        // Action Admin : Rejeter un dépôt
         function adminRejectRecharge(key) {
             db.ref('recharges/' + key).update({ status: 'Rejeté' });
             alert("Dépôt rejeté.");
         }
 
-        // Action Admin : Approuver un retrait
         function adminApproveWithdrawal(key) {
             db.ref('withdrawals/' + key).update({ status: 'Validé' });
             alert("Retrait approuvé.");
         }
 
-        // Action Admin : Rejeter un retrait et rembourser le solde
         function adminRejectWithdrawal(key, phone, amount) {
             db.ref('users/' + phone).once('value').then(snap => {
                 let currentBal = Number(snap.val()?.balance) || 0;
@@ -960,7 +1018,6 @@
             });
         }
 
-        // Action Admin : Attribution manuelle
         function adminGrantPackageOrBalance() {
             const phone = document.getElementById('admin-target-phone').value.trim();
             const vipId = Number(document.getElementById('admin-target-vip').value);
