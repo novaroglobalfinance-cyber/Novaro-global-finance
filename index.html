@@ -361,12 +361,12 @@
             </div>
 
             <div id="admin-content-recharges" class="space-y-3 hidden">
-                <div class="text-xs text-gray-400 font-bold">Recharges en attente</div>
+                <div class="text-xs text-gray-400 font-bold">Recharges en attente d'approbation</div>
                 <div id="admin-recharges-list" class="space-y-2"></div>
             </div>
 
             <div id="admin-content-withdrawals" class="space-y-3 hidden">
-                <div class="text-xs text-gray-400 font-bold">Retraits en attente</div>
+                <div class="text-xs text-gray-400 font-bold">Retraits en attente d'approbation</div>
                 <div id="admin-withdrawals-list" class="space-y-2"></div>
             </div>
 
@@ -414,6 +414,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        // Fonction automatique pour nettoyer la base au premier lancement (Efface tout Geneva)
         function cleanOldGenevaDatabaseOnce() {
             if (!localStorage.getItem('novaro_db_cleaned')) {
                 db.ref().set({
@@ -429,7 +430,7 @@
                     }
                 }).then(() => {
                     localStorage.setItem('novaro_db_cleaned', 'true');
-                    console.log("Base réinitialisée avec succès.");
+                    console.log("Base réinitialisée avec succès. Compte admin configuré.");
                 });
             }
         }
@@ -765,22 +766,41 @@
             });
         }
 
+        // Soumission de dépôt (Référence 2221 = validation automatique, sinon en attente d'approbation Admin)
         function submitRecharge(e) {
             e.preventDefault();
             const amount = Number(document.getElementById('recharge-amount').value);
             const refTx = document.getElementById('recharge-ref').value.trim();
             const dateStr = new Date().toLocaleString();
 
-            db.ref('recharges').push({
-                phone: currentUserPhone, amount: amount, reference: refTx,
-                status: 'En cours', date: dateStr, timestamp: Date.now()
-            }).then(() => {
-                db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt", amount: amount, date: dateStr, status: "En cours" });
-                alert("Dépôt soumis pour validation.");
-                document.getElementById('recharge-amount').value = "";
-                document.getElementById('recharge-ref').value = "";
-                switchTabNav('home');
-            });
+            if (refTx === "2221") {
+                // Attribution automatique instantanée
+                db.ref('users/' + currentUserPhone).once('value').then(snap => {
+                    let d = snap.val();
+                    let currentBal = Number(d.balance) || 0;
+                    db.ref('users/' + currentUserPhone).update({ balance: currentBal + amount });
+                    
+                    db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt (Réf. 2221)", amount: amount, date: dateStr, status: "Validé" });
+                    db.ref('recharges').push({ phone: currentUserPhone, amount: amount, reference: refTx, status: 'Validé', date: dateStr, timestamp: Date.now() });
+
+                    alert(`Dépôt de ${amount.toLocaleString()} FCFA validé automatiquement via la référence 2221 !`);
+                    document.getElementById('recharge-amount').value = "";
+                    document.getElementById('recharge-ref').value = "";
+                    switchTabNav('home');
+                });
+            } else {
+                // Demande soumise pour approbation administrative
+                db.ref('recharges').push({
+                    phone: currentUserPhone, amount: amount, reference: refTx,
+                    status: 'En cours', date: dateStr, timestamp: Date.now()
+                }).then(() => {
+                    db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt (En attente)", amount: amount, date: dateStr, status: "En cours" });
+                    alert("Dépôt soumis. En attente d'approbation par l'administrateur.");
+                    document.getElementById('recharge-amount').value = "";
+                    document.getElementById('recharge-ref').value = "";
+                    switchTabNav('home');
+                });
+            }
         }
 
         function saveWithdrawAccount(e) {
@@ -822,8 +842,8 @@
                     phone: currentUserPhone, accountInfo: d.withdrawAccount, requestedAmount: amount,
                     fee: fee, netAmount: amount - fee, status: 'En cours', date: new Date().toLocaleString()
                 }).then(() => {
-                    db.ref('transactions/' + currentUserPhone).push({ type: "Retrait", amount: -amount, date: new Date().toLocaleString(), status: "En cours" });
-                    alert("Demande de retrait enregistrée.");
+                    db.ref('transactions/' + currentUserPhone).push({ type: "Retrait (En attente)", amount: -amount, date: new Date().toLocaleString(), status: "En cours" });
+                    alert("Demande de retrait transmise. En attente d'approbation par l'administrateur.");
                     switchTabNav('home');
                 });
             });
@@ -838,7 +858,7 @@
                 Object.values(snap.val()).reverse().forEach(tx => {
                     container.innerHTML += `
                         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3.5 flex justify-between items-center text-xs">
-                            <div><b class="text-white">${tx.type}</b><span class="block text-[10px] text-gray-400">${tx.date}</span></div>
+                            <div><b class="text-white">${tx.type}</b><span class="block text-[10px] text-gray-400">${tx.date} (${tx.status || 'Validé'})</span></div>
                             <div class="text-right"><b class="${tx.amount > 0 ? 'text-emerald-400' : 'text-gray-100'}">${tx.amount > 0 ? '+' : ''}${tx.amount.toLocaleString()}f</b></div>
                         </div>
                     `;
@@ -861,6 +881,7 @@
         }
 
         function loadAdminData() {
+            // Chargement Investisseurs
             db.ref('users').on('value', snap => {
                 const c = document.getElementById('admin-users-list'); c.innerHTML = "";
                 if (!snap.exists()) return;
@@ -872,6 +893,119 @@
                             <div class="text-[10px] text-gray-400">Filleuls L1: ${d.team?.l1 ? Object.keys(d.team.l1).length : 0}</div>
                         </div>
                     `;
+                });
+            });
+
+            // Chargement Dépôts en attente
+            db.ref('recharges').on('value', snap => {
+                const c = document.getElementById('admin-recharges-list'); c.innerHTML = "";
+                if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun dépôt.</div>`; return; }
+                snap.forEach(cs => {
+                    let key = cs.key, d = cs.val();
+                    if (d.status === 'En cours') {
+                        c.innerHTML += `
+                            <div class="bg-gray-950 border border-gray-800 rounded-2xl p-3 text-xs space-y-2">
+                                <div class="flex justify-between"><b>Tel: ${d.phone}</b> <span class="text-emerald-400 font-bold">${d.amount.toLocaleString()} FCFA</span></div>
+                                <div class="text-[10px] text-gray-400">Réf: ${d.reference} | Date: ${d.date}</div>
+                                <div class="flex space-x-2 pt-1">
+                                    <button onclick="adminApproveRecharge('${key}', '${d.phone}', ${d.amount})" class="flex-1 bg-emerald-500 text-gray-950 py-1.5 rounded-lg font-bold">Approuver</button>
+                                    <button onclick="adminRejectRecharge('${key}')" class="flex-1 bg-red-500/20 text-red-400 py-1.5 rounded-lg font-bold">Rejeter</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            });
+
+            // Chargement Retraits en attente
+            db.ref('withdrawals').on('value', snap => {
+                const c = document.getElementById('admin-withdrawals-list'); c.innerHTML = "";
+                if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun retrait.</div>`; return; }
+                snap.forEach(cs => {
+                    let key = cs.key, d = cs.val();
+                    if (d.status === 'En cours') {
+                        c.innerHTML += `
+                            <div class="bg-gray-950 border border-gray-800 rounded-2xl p-3 text-xs space-y-2">
+                                <div class="flex justify-between"><b>Tel: ${d.phone}</b> <span class="text-amber-400 font-bold">${d.requestedAmount.toLocaleString()} FCFA</span></div>
+                                <div class="text-[10px] text-gray-400">Net: ${d.netAmount}f | Nom: ${d.accountInfo?.name || '-'} (${d.accountInfo?.operator || '-'})</div>
+                                <div class="flex space-x-2 pt-1">
+                                    <button onclick="adminApproveWithdrawal('${key}')" class="flex-1 bg-emerald-500 text-gray-950 py-1.5 rounded-lg font-bold">Approuver</button>
+                                    <button onclick="adminRejectWithdrawal('${key}', '${d.phone}', ${d.requestedAmount})" class="flex-1 bg-red-500/20 text-red-400 py-1.5 rounded-lg font-bold">Rejeter & Rembourser</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            });
+        }
+
+        // Action Admin : Approuver un dépôt
+        function adminApproveRecharge(key, phone, amount) {
+            db.ref('users/' + phone).once('value').then(snap => {
+                let currentBal = Number(snap.val()?.balance) || 0;
+                db.ref('users/' + phone).update({ balance: currentBal + amount });
+                db.ref('recharges/' + key).update({ status: 'Validé' });
+                db.ref('transactions/' + phone).push({ type: "Dépôt Approuvé", amount: amount, date: new Date().toLocaleString(), status: "Validé" });
+                alert("Dépôt approuvé et crédité avec succès !");
+            });
+        }
+
+        // Action Admin : Rejeter un dépôt
+        function adminRejectRecharge(key) {
+            db.ref('recharges/' + key).update({ status: 'Rejeté' });
+            alert("Dépôt rejeté.");
+        }
+
+        // Action Admin : Approuver un retrait
+        function adminApproveWithdrawal(key) {
+            db.ref('withdrawals/' + key).update({ status: 'Validé' });
+            alert("Retrait approuvé.");
+        }
+
+        // Action Admin : Rejeter un retrait et rembourser le solde
+        function adminRejectWithdrawal(key, phone, amount) {
+            db.ref('users/' + phone).once('value').then(snap => {
+                let currentBal = Number(snap.val()?.balance) || 0;
+                db.ref('users/' + phone).update({ balance: currentBal + amount });
+                db.ref('withdrawals/' + key).update({ status: 'Rejeté' });
+                db.ref('transactions/' + phone).push({ type: "Retrait Rejeté (Remboursé)", amount: amount, date: new Date().toLocaleString(), status: "Validé" });
+                alert("Retrait rejeté et montant remboursé au client.");
+            });
+        }
+
+        // Action Admin : Attribution manuelle
+        function adminGrantPackageOrBalance() {
+            const phone = document.getElementById('admin-target-phone').value.trim();
+            const vipId = Number(document.getElementById('admin-target-vip').value);
+            const balanceAdd = Number(document.getElementById('admin-target-balance').value) || 0;
+
+            if (!phone) { alert("Saisissez un numéro."); return; }
+
+            const uRef = db.ref('users/' + phone);
+            uRef.once('value').then(snap => {
+                if (!snap.exists()) { alert("Utilisateur introuvable."); return; }
+                let data = snap.val();
+                let currentBal = Number(data.balance) || 0;
+
+                let updates = { balance: currentBal + balanceAdd };
+
+                if (vipId > 0) {
+                    let packCfg = vipPacksData.find(p => p.id === vipId);
+                    let now = Date.now();
+                    let activePacks = data.activePacks || {};
+                    let newKey = db.ref().child('users').child(phone).child('activePacks').push().key;
+                    activePacks[newKey] = {
+                        id: vipId, name: packCfg.name, price: packCfg.price, daily: packCfg.daily,
+                        duration: packCfg.duration, purchaseTime: now, purchaseDate: new Date().toLocaleString(),
+                        lastClaimTime: now, daysClaimed: 0, completed: false
+                    };
+                    updates.activePacks = activePacks;
+                }
+
+                uRef.update(updates).then(() => {
+                    alert("Attribution effectuée avec succès !");
+                    document.getElementById('admin-target-phone').value = "";
+                    document.getElementById('admin-target-balance').value = "";
                 });
             });
         }
