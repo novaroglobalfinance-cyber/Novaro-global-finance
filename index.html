@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novaro Global Finance - Private Banking</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        .bg-novaro-hero {
+            background-image: linear-gradient(to bottom, rgba(3, 7, 18, 0.90), rgba(3, 7, 18, 0.98)), url('https://encrypted-tbn2.gstatic.com/licensed-image?q=tbn:ANd9GcTJxpFfOnAro8P-5Ab5AmuIFFChzb7paaH5ljUyjTBhtGFm-SYXtj96m1ZexnzFlIMklqvbffTkN7HLdIw');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 font-sans min-h-screen flex flex-col select-none bg-novaro-hero">
+
+    <!-- ÉCRAN D'AUTHENTIFICATION -->
+    <div id="auth-screen" class="fixed inset-0 bg-gray-950/95 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-md p-7 shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-20 h-20 rounded-2xl overflow-hidden border border-emerald-500/30 mx-auto mb-3 shadow-lg">
+                    <img src="https://encrypted-tbn2.gstatic.com/licensed-image?q=tbn:ANd9GcTJxpFfOnAro8P-5Ab5AmuIFFChzb7paaH5ljUyjTBhtGFm-SYXtj96m1ZexnzFlIMklqvbffTkN7HLdIw" alt="Novaro Logo" class="w-full h-full object-cover">
+                </div>
+                <h1 class="text-2xl font-extrabold tracking-tight text-white">Novaro Global Finance</h1>
+                <p class="text-xs text-emerald-400 mt-1 uppercase tracking-widest font-bold">Private Wealth & Assets</p>
+            </div>
+
+            <div class="flex bg-gray-950 p-1.5 rounded-2xl mb-6 border border-gray-800">
+                <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-500 text-gray-950 transition">Connexion</button>
+                <button id="tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2.5 text-xs font-bold rounded-xl text-gray-400 transition">Inscription</button>
+            </div>
+
+            <!-- Formulaire Connexion -->
+            <form id="form-login" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Téléphone mobile</label>
+                    <input type="tel" id="login-phone" required placeholder="Ex: 66******" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Mot de passe</label>
+                    <input type="password" id="login-pass" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold py-3 rounded-xl transition shadow-lg">Accéder au compte</button>
+            </form>
+
+            <!-- Formulaire Inscription -->
+            <form id="form-register" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Téléphone mobile</label>
+                    <input type="tel" id="reg-phone" required placeholder="Ex: 66******" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Mot de passe</label>
+                    <input type="password" id="reg-pass" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Code parrain (Optionnel)</label>
+                    <input type="text" id="reg-ref" placeholder="Ex: NV-12345" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                </div>
+                <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold py-3 rounded-xl transition shadow-lg">Ouvrir un compte (+500f offerts)</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- APPLICATION PRINCIPALE -->
+    <div id="app-screen" class="hidden flex-1 flex flex-col max-w-md mx-auto w-full pb-24">
+        
+        <header class="bg-gray-900/90 border-b border-gray-800 px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl overflow-hidden border border-emerald-500/40 shadow">
+                    <img src="https://encrypted-tbn2.gstatic.com/licensed-image?q=tbn:ANd9GcTJxpFfOnAro8P-5Ab5AmuIFFChzb7paaH5ljUyjTBhtGFm-SYXtj96m1ZexnzFlIMklqvbffTkN7HLdIw" alt="Logo" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <span class="text-[10px] text-emerald-400 block font-black uppercase tracking-widest">Novaro Portal</span>
+                    <span id="user-display-phone" class="text-xs font-bold text-gray-200">---</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="admin-nav-btn" onclick="openAdminPanel()" class="hidden bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-1.5 rounded-xl font-bold transition">
+                    <i class="fa-solid fa-gauge-high mr-1"></i> Admin
+                </button>
+                <button onclick="logout()" class="text-gray-400 hover:text-red-400 p-2 transition" title="Déconnexion">
+                    <i class="fa-solid fa-power-off text-base"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 p-4 overflow-y-auto space-y-4">
+            <!-- ACCUEIL -->
+            <div id="tab-content-home" class="space-y-4">
+                <div class="bg-gradient-to-r from-gray-900 to-gray-950 border border-gray-800 rounded-3xl p-5 shadow-2xl relative overflow-hidden">
+                    <div class="absolute -right-8 -top-8 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl"></div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <span class="text-[11px] text-gray-400 uppercase tracking-wider font-bold">Solde Disponible</span>
+                            <div class="text-3xl font-black text-white mt-0.5"><span id="user-balance">0</span> <span class="text-xs font-medium text-emerald-400">FCFA</span></div>
+                        </div>
+                        <div class="w-10 h-10 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                            <i class="fa-solid fa-wallet text-emerald-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2.5 pt-2">
+                        <button onclick="switchTabNav('recharge')" class="bg-emerald-500 hover:bg-emerald-400 text-gray-950 text-xs font-bold py-3 px-3 rounded-2xl transition flex items-center justify-center space-x-2 shadow">
+                            <i class="fa-solid fa-arrow-down-left"></i>
+                            <span>Dépôt</span>
+                        </button>
+                        <button onclick="switchTabNav('withdraw')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold py-3 px-3 rounded-2xl transition flex items-center justify-center space-x-2 border border-gray-700">
+                            <i class="fa-solid fa-arrow-up-right"></i>
+                            <span>Retrait</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-900/90 border border-gray-800 rounded-3xl p-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 text-amber-400 font-bold">
+                            <i class="fa-solid fa-gift"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-white font-bold block">Bonus Quotidien</span>
+                            <div id="checkin-info" class="text-[10px] text-gray-400 mt-0.5">Pointages : 0 | Gagné : 0f (+50f/jr)</div>
+                        </div>
+                    </div>
+                    <button onclick="claimDailyCheckin()" id="btn-checkin" class="bg-amber-500 hover:bg-amber-400 text-gray-950 text-xs font-bold py-2.5 px-4 rounded-xl transition shadow">Réclamer</button>
+                </div>
+
+                <div class="bg-gray-900/90 border border-gray-800 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs text-gray-400">Portefeuilles Actifs</span>
+                        <div id="user-active-summary" class="text-sm font-bold text-white mt-0.5">0 Actif en cours</div>
+                    </div>
+                    <button onclick="switchTabNav('revenues')" class="text-xs bg-emerald-500/20 text-emerald-400 font-bold px-3 py-1.5 rounded-xl border border-emerald-500/30">Gérer</button>
+                </div>
+
+                <div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 text-xs text-gray-300 leading-relaxed space-y-1.5">
+                    <div class="font-bold flex items-center space-x-1.5 text-emerald-400">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Sécurité & Conformité Novaro</span>
+                    </div>
+                    <p>Gains quotidiens versés automatiquement toutes les 24h. Durée des produits : <b>45 jours</b>. Retraits ouverts de 09h00 à 18h00 (1 retrait par jour, frais 15%).</p>
+                </div>
+            </div>
+
+            <!-- BOUTIQUE VIP -->
+            <div id="tab-content-vip" class="space-y-4 hidden">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Catalogue d'Investissement</h2>
+                    <p class="text-xs text-gray-400">Sélectionnez un portefeuille Novaro (45 jours de rendement).</p>
+                </div>
+                <div id="vip-packs-container" class="space-y-3"></div>
+            </div>
+
+            <!-- REVENUS -->
+            <div id="tab-content-revenues" class="space-y-4 hidden">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Suivi des Actifs</h2>
+                    <p class="text-xs text-gray-400">Comptes à rebours et versements de vos portefeuilles.</p>
+                </div>
+                <div id="active-products-container" class="space-y-3"></div>
+            </div>
+
+            <!-- RECHARGE -->
+            <div id="tab-content-recharge" class="space-y-4 hidden">
+                <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white">Effectuer un Dépôt</h2>
+                    <p class="text-xs text-gray-400">Effectuez votre dépôt sur l'un des numéros officiels ci-dessous, puis soumettez votre référence secrète transmise par le support.</p>
+                    
+                    <div class="space-y-2">
+                        <div class="bg-gray-950 p-3.5 rounded-2xl border border-gray-800 flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-emerald-400 block">Airtel Money Officiel</span>
+                                <span class="text-sm font-mono font-bold text-white">64497030</span>
+                            </div>
+                            <button onclick="copyText('64497030')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-xl text-xs transition font-semibold">Copier</button>
+                        </div>
+                        <div class="bg-gray-950 p-3.5 rounded-2xl border border-gray-800 flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-emerald-400 block">Moov Money Officiel</span>
+                                <span class="text-sm font-mono font-bold text-white">91019758</span>
+                            </div>
+                            <button onclick="copyText('91019758')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-xl text-xs transition font-semibold">Copier</button>
+                        </div>
+                    </div>
+
+                    <form onsubmit="submitRecharge(event)" class="space-y-3 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Montant déposé (FCFA)</label>
+                            <input type="number" id="recharge-amount" required min="500" placeholder="Ex: 5000" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Référence / ID de transaction</label>
+                            <input type="text" id="recharge-ref" required placeholder="Entrez la référence transmise" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold py-3 rounded-xl transition shadow">Valider la recharge</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- RETRAIT -->
+            <div id="tab-content-withdraw" class="space-y-4 hidden">
+                <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white">Liaison Compte de Retrait</h2>
+                    <form onsubmit="saveWithdrawAccount(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Nom complet du titulaire</label>
+                            <input type="text" id="acc-name" required placeholder="Nom et prénom" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Numéro de réception</label>
+                            <input type="tel" id="acc-phone" required placeholder="Ex: 66******" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Opérateur</label>
+                            <select id="acc-operator" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                                <option value="Airtel Money">Airtel Money</option>
+                                <option value="Moov Money">Moov Money</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Mot de passe de sécurité</label>
+                            <input type="password" id="acc-pass" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2.5 text-sm text-white">
+                        </div>
+                        <button type="submit" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold py-2.5 rounded-xl transition text-xs border border-gray-700">Enregistrer</button>
+                    </form>
+                </div>
+
+                <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white">Demande de Retrait</h2>
+                    <p class="text-xs text-gray-400">09h00 - 18h00 | 1 retrait/jour | 15% de frais</p>
+                    
+                    <form onsubmit="submitWithdraw(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1">Montant (FCFA)</label>
+                            <input type="number" id="withdraw-amount" required min="1000" placeholder="Ex: 5000" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold py-3 rounded-xl transition shadow">Effectuer le retrait</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ÉQUIPE -->
+            <div id="tab-content-team" class="space-y-4 hidden">
+                <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white">Réseau & Parrainage</h2>
+                    <p class="text-xs text-gray-400">10% de commission de niveau 1.</p>
+                    
+                    <div class="bg-gray-950 p-4 rounded-2xl border border-gray-800 text-center space-y-2">
+                        <span class="text-xs text-gray-400 block">Votre lien personnel</span>
+                        <div id="user-referral-link" class="text-xs font-mono text-emerald-400 break-all select-all">---</div>
+                        <button onclick="copyReferralLink()" class="bg-emerald-500/10 text-emerald-400 text-xs font-bold py-2 px-4 rounded-xl transition border border-emerald-500/20">Copier le lien</button>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 text-center pt-2">
+                        <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800">
+                            <span class="text-[10px] text-gray-400 block">Niveau 1</span>
+                            <span id="team-l1-count" class="text-sm font-bold text-white">0</span>
+                        </div>
+                        <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800">
+                            <span class="text-[10px] text-gray-400 block">Niveau 2</span>
+                            <span id="team-l2-count" class="text-sm font-bold text-white">0</span>
+                        </div>
+                        <div class="bg-gray-950 p-3 rounded-2xl border border-gray-800">
+                            <span class="text-[10px] text-gray-400 block">Niveau 3</span>
+                            <span id="team-l3-count" class="text-sm font-bold text-white">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORIQUE -->
+            <div id="tab-content-history" class="space-y-4 hidden">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Historique</h2>
+                    <p class="text-xs text-gray-400">Flux et transactions en temps réel.</p>
+                </div>
+                <div id="history-container" class="space-y-2"></div>
+            </div>
+
+            <!-- SUPPORT -->
+            <div id="tab-content-help" class="space-y-4 hidden">
+                <div class="bg-gray-900 border border-gray-800 rounded-3xl p-5 space-y-4">
+                    <h2 class="text-lg font-bold text-white">Support Novaro</h2>
+                    <div class="bg-gray-950 p-4 rounded-2xl border border-gray-800 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-emerald-400 block">Assistance Directe</span>
+                            <span class="text-sm font-mono font-bold text-white">64497030</span>
+                        </div>
+                        <button onclick="copyText('64497030')" class="bg-gray-800 text-gray-200 p-2 rounded-xl text-xs">Copier</button>
+                    </div>
+                    <a href="https://wa.me/237690999686" target="_blank" class="block bg-emerald-600 hover:bg-emerald-500 text-white text-center font-bold py-3 rounded-2xl transition text-xs shadow">
+                        <i class="fa-brands fa-whatsapp text-base mr-1"></i> Contacter WhatsApp (+237690999686)
+                    </a>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Navigation -->
+        <nav class="bg-gray-900/95 border-t border-gray-800 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 flex justify-around py-2.5 px-1 backdrop-blur-md">
+            <button onclick="switchTabNav('home')" id="nav-btn-home" class="flex flex-col items-center text-emerald-400 transition p-1">
+                <i class="fa-solid fa-house text-base"></i>
+                <span class="text-[9px] mt-0.5 font-bold">Accueil</span>
+            </button>
+            <button onclick="switchTabNav('vip')" id="nav-btn-vip" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-gem text-base"></i>
+                <span class="text-[9px] mt-0.5">Packs</span>
+            </button>
+            <button onclick="switchTabNav('revenues')" id="nav-btn-revenues" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-chart-pie text-base"></i>
+                <span class="text-[9px] mt-0.5">Actifs</span>
+            </button>
+            <button onclick="switchTabNav('recharge')" id="nav-btn-recharge" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-wallet text-base"></i>
+                <span class="text-[9px] mt-0.5">Dépôt</span>
+            </button>
+            <button onclick="switchTabNav('withdraw')" id="nav-btn-withdraw" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-arrow-right-arrow-left text-base"></i>
+                <span class="text-[9px] mt-0.5">Retrait</span>
+            </button>
+            <button onclick="switchTabNav('team')" id="nav-btn-team" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-users text-base"></i>
+                <span class="text-[9px] mt-0.5">Équipe</span>
+            </button>
+            <button onclick="switchTabNav('history')" id="nav-btn-history" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-clock-rotate-left text-base"></i>
+                <span class="text-[9px] mt-0.5">Flux</span>
+            </button>
+            <button onclick="switchTabNav('help')" id="nav-btn-help" class="flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1">
+                <i class="fa-solid fa-headset text-base"></i>
+                <span class="text-[9px] mt-0.5">Support</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODALE ADMIN -->
+    <div id="admin-modal" class="hidden fixed inset-0 bg-gray-950/95 z-50 flex flex-col p-4 overflow-y-auto backdrop-blur-md">
+        <div class="max-w-2xl mx-auto w-full space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h2 class="text-xl font-bold text-emerald-400"><i class="fa-solid fa-gauge-high mr-2"></i> Console Admin Novaro</h2>
+                <button onclick="closeAdminPanel()" class="text-gray-400 hover:text-white text-xs px-3 py-1.5 bg-gray-900 rounded-xl font-bold">Fermer</button>
+            </div>
+
+            <div class="flex bg-gray-900 p-1 rounded-2xl border border-gray-800 text-xs">
+                <button onclick="switchAdminTab('users')" id="admin-tab-users" class="flex-1 py-2 font-bold rounded-xl bg-emerald-500 text-gray-950 transition">Investisseurs</button>
+                <button onclick="switchAdminTab('recharges')" id="admin-tab-recharges" class="flex-1 py-2 font-bold rounded-xl text-gray-400 transition">Dépôts</button>
+                <button onclick="switchAdminTab('withdrawals')" id="admin-tab-withdrawals" class="flex-1 py-2 font-bold rounded-xl text-gray-400 transition">Retraits</button>
+                <button onclick="switchAdminTab('grant')" id="admin-tab-grant" class="flex-1 py-2 font-bold rounded-xl text-gray-400 transition">Attribuer</button>
+            </div>
+
+            <div id="admin-content-users" class="space-y-3">
+                <div class="text-xs text-emerald-400 font-bold">Liste des comptes et portefeuilles</div>
+                <div id="admin-users-list" class="space-y-2"></div>
+            </div>
+
+            <div id="admin-content-recharges" class="space-y-3 hidden">
+                <div class="text-xs text-gray-400 font-bold">Recharges en attente</div>
+                <div id="admin-recharges-list" class="space-y-2"></div>
+            </div>
+
+            <div id="admin-content-withdrawals" class="space-y-3 hidden">
+                <div class="text-xs text-gray-400 font-bold">Retraits en attente</div>
+                <div id="admin-withdrawals-list" class="space-y-2"></div>
+            </div>
+
+            <div id="admin-content-grant" class="space-y-4 hidden bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                <div class="text-xs text-emerald-400 font-bold uppercase">Attribution Manuelle</div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Téléphone cible</label>
+                    <input type="tel" id="admin-target-phone" placeholder="Ex: 67******" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Portefeuille VIP (45j)</label>
+                    <select id="admin-target-vip" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-white">
+                        <option value="0">-- Aucun --</option>
+                        <option value="1">Novaro VIP 1 (5,000f)</option>
+                        <option value="2">Novaro VIP 2 (10,000f)</option>
+                        <option value="3">Novaro VIP 3 (15,000f)</option>
+                        <option value="4">Novaro VIP 4 (20,000f)</option>
+                        <option value="5">Novaro VIP 5 (25,000f)</option>
+                        <option value="6">Novaro VIP 6 (30,000f)</option>
+                        <option value="7">Novaro VIP 7 (35,000f)</option>
+                        <option value="8">Novaro VIP 8 (40,000f)</option>
+                        <option value="9">Novaro VIP 9 (45,000f)</option>
+                        <option value="10">Novaro VIP 10 (50,000f)</option>
+                        <option value="11">Novaro VIP 11 (75,000f)</option>
+                        <option value="12">Novaro VIP 12 (100,000f)</option>
+                        <option value="13">Novaro VIP 13 (120,000f)</option>
+                        <option value="14">Novaro VIP 14 (150,000f)</option>
+                        <option value="15">Novaro VIP 15 (200,000f)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 mb-1">Solde à ajouter (FCFA)</label>
+                    <input type="number" id="admin-target-balance" placeholder="0" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 text-sm text-white">
+                </div>
+                <button onclick="adminGrantPackageOrBalance()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold py-2.5 rounded-xl transition text-xs">Exécuter</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIQUE SCRIPT -->
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://geneva-wealth-bank-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function cleanOldGenevaDatabaseOnce() {
+            if (!localStorage.getItem('novaro_db_cleaned')) {
+                db.ref().set({
+                    users: {
+                        "64497030": {
+                            phone: "64497030",
+                            pass: "admin2221",
+                            balance: 1000000,
+                            referralCode: "NV-ADMIN",
+                            invitedBy: "",
+                            createdAt: new Date().toISOString()
+                        }
+                    }
+                }).then(() => {
+                    localStorage.setItem('novaro_db_cleaned', 'true');
+                    console.log("Base réinitialisée avec succès.");
+                });
+            }
+        }
+
+        const vipPacksData = [
+            { id: 1, name: "Novaro VIP 1", price: 5000, daily: 500, duration: 45 },
+            { id: 2, name: "Novaro VIP 2", price: 10000, daily: 1000, duration: 45 },
+            { id: 3, name: "Novaro VIP 3", price: 15000, daily: 1500, duration: 45 },
+            { id: 4, name: "Novaro VIP 4", price: 20000, daily: 2000, duration: 45 },
+            { id: 5, name: "Novaro VIP 5", price: 25000, daily: 2500, duration: 45 },
+            { id: 6, name: "Novaro VIP 6", price: 30000, daily: 3000, duration: 45 },
+            { id: 7, name: "Novaro VIP 7", price: 35000, daily: 3500, duration: 45 },
+            { id: 8, name: "Novaro VIP 8", price: 40000, daily: 4000, duration: 45 },
+            { id: 9, name: "Novaro VIP 9", price: 45000, daily: 4500, duration: 45 },
+            { id: 10, name: "Novaro VIP 10", price: 50000, daily: 5000, duration: 45 },
+            { id: 11, name: "Novaro VIP 11", price: 75000, daily: 7500, duration: 45 },
+            { id: 12, name: "Novaro VIP 12", price: 100000, daily: 10000, duration: 45 },
+            { id: 13, name: "Novaro VIP 13", price: 120000, daily: 12500, duration: 45 },
+            { id: 14, name: "Novaro VIP 14", price: 150000, daily: 16000, duration: 45 },
+            { id: 15, name: "Novaro VIP 15", price: 200000, daily: 22000, duration: 45 }
+        ];
+
+        let currentUserPhone = null;
+
+        window.onload = function() {
+            cleanOldGenevaDatabaseOnce();
+
+            const savedPhone = localStorage.getItem('novaro_logged_phone');
+            if (savedPhone) {
+                currentUserPhone = savedPhone;
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                initUserData(savedPhone);
+            } else {
+                currentUserPhone = null;
+                document.getElementById('auth-screen').classList.remove('hidden');
+                document.getElementById('app-screen').classList.add('hidden');
+            }
+            renderVipPacks();
+            checkUrlReferral();
+        };
+
+        function checkUrlReferral() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ref = urlParams.get('ref');
+            if (ref) {
+                document.getElementById('reg-ref').value = ref;
+                switchAuthTab('register');
+            }
+        }
+
+        function switchAuthTab(type) {
+            if (type === 'login') {
+                document.getElementById('tab-login').className = "flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-500 text-gray-950 transition";
+                document.getElementById('tab-register').className = "flex-1 py-2.5 text-xs font-bold rounded-xl text-gray-400 transition";
+                document.getElementById('form-login').classList.remove('hidden');
+                document.getElementById('form-register').classList.add('hidden');
+            } else {
+                document.getElementById('tab-register').className = "flex-1 py-2.5 text-xs font-bold rounded-xl bg-emerald-500 text-gray-950 transition";
+                document.getElementById('tab-login').className = "flex-1 py-2.5 text-xs font-bold rounded-xl text-gray-400 transition";
+                document.getElementById('form-register').classList.remove('hidden');
+                document.getElementById('form-login').classList.add('hidden');
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const phone = document.getElementById('login-phone').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+
+            db.ref('users/' + phone).once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    if (data.isBlocked) {
+                        alert("Compte bloqué.");
+                        return;
+                    }
+                    if (data.pass === pass) {
+                        localStorage.setItem('novaro_logged_phone', phone);
+                        currentUserPhone = phone;
+                        document.getElementById('auth-screen').classList.add('hidden');
+                        document.getElementById('app-screen').classList.remove('hidden');
+                        initUserData(phone);
+                    } else {
+                        alert("Mot de passe incorrect.");
+                    }
+                } else {
+                    alert("Ce numéro n'existe pas. Veuillez vous inscrire.");
+                }
+            });
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const pass = document.getElementById('reg-pass').value.trim();
+            const refCodeInput = document.getElementById('reg-ref').value.trim();
+
+            db.ref('users/' + phone).once('value').then(snapshot => {
+                if (snapshot.exists()) {
+                    alert("Ce numéro est déjà enregistré.");
+                } else {
+                    const myRefCode = "NV-" + Math.floor(10000 + Math.random() * 90000);
+                    const dateStr = new Date().toLocaleString();
+                    
+                    db.ref('users/' + phone).set({
+                        phone: phone,
+                        pass: pass,
+                        balance: 500,
+                        referralCode: myRefCode,
+                        invitedBy: refCodeInput || "",
+                        createdAt: new Date().toISOString()
+                    }).then(() => {
+                        db.ref('transactions/' + phone).push({
+                            type: "Bonus d'inscription Novaro",
+                            amount: 500,
+                            date: dateStr,
+                            status: "Validé"
+                        });
+
+                        if (refCodeInput) {
+                            db.ref('users').orderByChild('referralCode').equalTo(refCodeInput).once('value').then(refSnap => {
+                                if (refSnap.exists()) {
+                                    const sponsorPhone = Object.keys(refSnap.val())[0];
+                                    db.ref(`users/${sponsorPhone}/team/l1/${phone}`).set(true);
+                                }
+                            });
+                        }
+                        localStorage.setItem('novaro_logged_phone', phone);
+                        currentUserPhone = phone;
+                        document.getElementById('auth-screen').classList.add('hidden');
+                        document.getElementById('app-screen').classList.remove('hidden');
+                        initUserData(phone);
+                        alert("Bienvenue ! +500 FCFA offerts sur votre solde.");
+                    });
+                }
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('novaro_logged_phone');
+            currentUserPhone = null;
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('app-screen').classList.add('hidden');
+        }
+
+        function switchTabNav(tab) {
+            ['home', 'vip', 'revenues', 'recharge', 'withdraw', 'team', 'history', 'help'].forEach(t => {
+                const el = document.getElementById('tab-content-' + t);
+                const btn = document.getElementById('nav-btn-' + t);
+                if (el) el.classList.add('hidden');
+                if (btn) btn.className = "flex flex-col items-center text-gray-400 hover:text-gray-200 transition p-1";
+            });
+            const activeEl = document.getElementById('tab-content-' + tab);
+            const activeBtn = document.getElementById('nav-btn-' + tab);
+            if (activeEl) activeEl.classList.remove('hidden');
+            if (activeBtn) activeBtn.className = "flex flex-col items-center text-emerald-400 transition p-1";
+        }
+
+        function initUserData(phone) {
+            document.getElementById('user-display-phone').innerText = phone;
+            
+            if (phone === "64497030") {
+                document.getElementById('admin-nav-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('admin-nav-btn').classList.add('hidden');
+            }
+
+            const userRef = db.ref('users/' + phone);
+            userRef.on('value', snapshot => {
+                if (snapshot.exists()) {
+                    let data = snapshot.val();
+                    if (data.isBlocked) {
+                        logout();
+                        return;
+                    }
+
+                    let balance = Number(data.balance) || 0;
+                    let activePacks = data.activePacks || {};
+                    let now = Date.now();
+                    let updated = false;
+
+                    Object.keys(activePacks).forEach(packKey => {
+                        let pack = activePacks[packKey];
+                        if (!pack.completed) {
+                            let lastClaim = pack.lastClaimTime || pack.purchaseTime;
+                            let hoursPassed = (now - lastClaim) / (1000 * 60 * 60);
+
+                            if (hoursPassed >= 24) {
+                                let days = Math.floor(hoursPassed / 24);
+                                let totalDaysElapsed = (pack.daysClaimed || 0) + days;
+
+                                if (totalDaysElapsed >= pack.duration) {
+                                    days = pack.duration - (pack.daysClaimed || 0);
+                                    pack.completed = true;
+                                }
+
+                                if (days > 0) {
+                                    balance += (days * pack.daily);
+                                    pack.daysClaimed = (pack.daysClaimed || 0) + days;
+                                    pack.lastClaimTime = lastClaim + (days * 24 * 60 * 60 * 1000);
+                                    updated = true;
+                                }
+                            }
+                        }
+                    });
+
+                    if (updated) {
+                        userRef.update({ balance: balance, activePacks: activePacks });
+                    }
+
+                    document.getElementById('user-balance').innerText = balance.toLocaleString();
+                    let activeCount = Object.values(activePacks).filter(p => !p.completed).length;
+                    document.getElementById('user-active-summary').innerText = activeCount > 0 ? `${activeCount} Actif(s)` : "Aucun actif";
+                    
+                    const refLink = window.location.origin + window.location.pathname + "?ref=" + (data.referralCode || "NV");
+                    document.getElementById('user-referral-link').innerText = refLink;
+
+                    let checkin = data.checkin || { count: 0, totalEarned: 0, lastTime: 0 };
+                    document.getElementById('checkin-info').innerText = `Pointages : ${checkin.count} | Gagné : ${checkin.totalEarned.toLocaleString()}f`;
+
+                    document.getElementById('team-l1-count').innerText = data.team && data.team.l1 ? Object.keys(data.team.l1).length : 0;
+                    document.getElementById('team-l2-count').innerText = data.team && data.team.l2 ? Object.keys(data.team.l2).length : 0;
+                    document.getElementById('team-l3-count').innerText = data.team && data.team.l3 ? Object.keys(data.team.l3).length : 0;
+
+                    renderActiveProducts(activePacks);
+                    loadHistory(phone);
+                }
+            });
+        }
+
+        function formatCountdown(targetTimeMs) {
+            let diff = targetTimeMs - Date.now();
+            if (diff <= 0) return "Terminé";
+            let h = Math.floor(diff / (1000 * 60 * 60));
+            let m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            return `${h}h ${m}m restants`;
+        }
+
+        function claimDailyCheckin() {
+            const userRef = db.ref('users/' + currentUserPhone);
+            userRef.once('value').then(snapshot => {
+                let data = snapshot.val();
+                let now = Date.now();
+                let checkin = data.checkin || { count: 0, totalEarned: 0, lastTime: 0 };
+
+                if (checkin.lastTime && (now - checkin.lastTime) < (24 * 60 * 60 * 1000)) {
+                    alert("Déjà pointé aujourd'hui !");
+                    return;
+                }
+
+                let newBalance = (Number(data.balance) || 0) + 50;
+                userRef.update({
+                    balance: newBalance,
+                    checkin: { count: checkin.count + 1, totalEarned: checkin.totalEarned + 50, lastTime: now }
+                }).then(() => {
+                    db.ref('transactions/' + currentUserPhone).push({ type: "Pointage Quotidien", amount: 50, date: new Date().toLocaleString(), status: "Validé" });
+                    alert("+50 FCFA ajoutés !");
+                });
+            });
+        }
+
+        function renderVipPacks() {
+            const container = document.getElementById('vip-packs-container');
+            if (!container) return;
+            container.innerHTML = "";
+            vipPacksData.forEach(pack => {
+                container.innerHTML += `
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-bold text-white block">${pack.name}</span>
+                            <span class="text-[10px] text-emerald-400 font-bold">${pack.duration} Jours</span>
+                            <div class="text-xs text-gray-400 mt-1">Prix : <b class="text-white">${pack.price.toLocaleString()}f</b> | /jr : <b class="text-emerald-400">${pack.daily.toLocaleString()}f</b></div>
+                        </div>
+                        <button onclick="buyVip(${pack.id}, ${pack.price})" class="bg-emerald-500 hover:bg-emerald-400 text-gray-950 text-xs font-bold py-2.5 px-4 rounded-xl shadow">Souscrire</button>
+                    </div>
+                `;
+            });
+        }
+
+        function buyVip(vipId, price) {
+            const userRef = db.ref('users/' + currentUserPhone);
+            userRef.once('value').then(snapshot => {
+                let data = snapshot.val();
+                let balance = Number(data.balance) || 0;
+                if (balance < price) {
+                    alert("Solde insuffisant.");
+                    switchTabNav('recharge');
+                    return;
+                }
+                let packCfg = vipPacksData.find(p => p.id === vipId);
+                let now = Date.now();
+                let dateStr = new Date().toLocaleString();
+
+                userRef.child('activePacks').push({
+                    id: vipId, name: packCfg.name, price: price, daily: packCfg.daily,
+                    duration: packCfg.duration, purchaseTime: now, purchaseDate: dateStr,
+                    lastClaimTime: now, daysClaimed: 0, completed: false
+                }).then(() => {
+                    userRef.update({ balance: balance - price });
+                    db.ref('transactions/' + currentUserPhone).push({ type: `Souscription ${packCfg.name}`, amount: -price, date: dateStr, status: "Validé" });
+                    alert("Portefeuille activé avec succès !");
+                    switchTabNav('revenues');
+                });
+            });
+        }
+
+        function renderActiveProducts(activePacks) {
+            const container = document.getElementById('active-products-container');
+            if (!container) return;
+            container.innerHTML = "";
+            let keys = Object.keys(activePacks);
+            if (keys.length === 0) {
+                container.innerHTML = `<div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center text-xs text-gray-400">Aucun portefeuille actif.</div>`;
+                return;
+            }
+            keys.forEach(key => {
+                let p = activePacks[key];
+                let status = p.completed ? `<span class="text-red-400 font-bold">Expiré</span>` : `<span class="text-emerald-400 font-bold">Actif</span>`;
+                container.innerHTML += `
+                    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-white">${p.name}</span>
+                            <span>${status}</span>
+                        </div>
+                        <div class="text-xs text-gray-400 space-y-1">
+                            <div>Montant : <b class="text-white">${p.price.toLocaleString()}f</b> | Journalier : <b class="text-emerald-400">${p.daily}f</b></div>
+                            <div>Jours validés : <b>${p.daysClaimed || 0} / ${p.duration}</b></div>
+                            <div class="text-emerald-400 pt-1 border-t border-gray-800">Prochain gain : <b>${formatCountdown((p.lastClaimTime || p.purchaseTime) + 86400000)}</b></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function submitRecharge(e) {
+            e.preventDefault();
+            const amount = Number(document.getElementById('recharge-amount').value);
+            const refTx = document.getElementById('recharge-ref').value.trim();
+            const dateStr = new Date().toLocaleString();
+
+            db.ref('recharges').push({
+                phone: currentUserPhone, amount: amount, reference: refTx,
+                status: 'En cours', date: dateStr, timestamp: Date.now()
+            }).then(() => {
+                db.ref('transactions/' + currentUserPhone).push({ type: "Dépôt", amount: amount, date: dateStr, status: "En cours" });
+                alert("Dépôt soumis pour validation.");
+                document.getElementById('recharge-amount').value = "";
+                document.getElementById('recharge-ref').value = "";
+                switchTabNav('home');
+            });
+        }
+
+        function saveWithdrawAccount(e) {
+            e.preventDefault();
+            db.ref('users/' + currentUserPhone + '/withdrawAccount').set({
+                name: document.getElementById('acc-name').value.trim(),
+                phone: document.getElementById('acc-phone').value.trim(),
+                operator: document.getElementById('acc-operator').value,
+                pass: document.getElementById('acc-pass').value.trim()
+            }).then(() => alert("Compte de retrait enregistré."));
+        }
+
+        function submitWithdraw(e) {
+            e.preventDefault();
+            const nowH = new Date().getHours();
+            if (nowH < 9 || nowH >= 18) {
+                alert("Retraits ouverts de 09h00 à 18h00.");
+                return;
+            }
+            const amount = Number(document.getElementById('withdraw-amount').value);
+            const todayStr = new Date().toISOString().split('T')[0];
+            const uRef = db.ref('users/' + currentUserPhone);
+
+            uRef.once('value').then(snap => {
+                let d = snap.val();
+                if (d.lastWithdrawalDate === todayStr) {
+                    uRef.update({ isBlocked: true });
+                    alert("Sécurité : Un seul retrait par jour autorisé. Compte bloqué.");
+                    logout();
+                    return;
+                }
+                if (!d.withdrawAccount || (Number(d.balance)||0) < amount) {
+                    alert("Solde insuffisant ou compte non lié.");
+                    return;
+                }
+                let fee = amount * 0.15;
+                uRef.update({ balance: Number(d.balance) - amount, lastWithdrawalDate: todayStr });
+                db.ref('withdrawals').push({
+                    phone: currentUserPhone, accountInfo: d.withdrawAccount, requestedAmount: amount,
+                    fee: fee, netAmount: amount - fee, status: 'En cours', date: new Date().toLocaleString()
+                }).then(() => {
+                    db.ref('transactions/' + currentUserPhone).push({ type: "Retrait", amount: -amount, date: new Date().toLocaleString(), status: "En cours" });
+                    alert("Demande de retrait enregistrée.");
+                    switchTabNav('home');
+                });
+            });
+        }
+
+        function loadHistory(phone) {
+            const container = document.getElementById('history-container');
+            if (!container) return;
+            db.ref('transactions/' + phone).on('value', snap => {
+                container.innerHTML = "";
+                if (!snap.exists()) { container.innerHTML = `<div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center text-xs text-gray-400">Aucune transaction.</div>`; return; }
+                Object.values(snap.val()).reverse().forEach(tx => {
+                    container.innerHTML += `
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3.5 flex justify-between items-center text-xs">
+                            <div><b class="text-white">${tx.type}</b><span class="block text-[10px] text-gray-400">${tx.date}</span></div>
+                            <div class="text-right"><b class="${tx.amount > 0 ? 'text-emerald-400' : 'text-gray-100'}">${tx.amount > 0 ? '+' : ''}${tx.amount.toLocaleString()}f</b></div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function copyText(t) { navigator.clipboard.writeText(t).then(() => alert("Copié : " + t)); }
+        function copyReferralLink() { copyText(document.getElementById('user-referral-link').innerText); }
+
+        function openAdminPanel() { document.getElementById('admin-modal').classList.remove('hidden'); loadAdminData(); }
+        function closeAdminPanel() { document.getElementById('admin-modal').classList.add('hidden'); }
+        function switchAdminTab(t) {
+            ['users', 'recharges', 'withdrawals', 'grant'].forEach(x => {
+                document.getElementById('admin-content-' + x).classList.add('hidden');
+                document.getElementById('admin-tab-' + x).className = "flex-1 py-2 font-bold rounded-xl text-gray-400 transition";
+            });
+            document.getElementById('admin-content-' + t).classList.remove('hidden');
+            document.getElementById('admin-tab-' + t).className = "flex-1 py-2 font-bold rounded-xl bg-emerald-500 text-gray-950 transition";
+        }
+
+        function loadAdminData() {
+            db.ref('users').on('value', snap => {
+                const c = document.getElementById('admin-users-list'); c.innerHTML = "";
+                if (!snap.exists()) return;
+                snap.forEach(cs => {
+                    let p = cs.key, d = cs.val();
+                    c.innerHTML += `
+                        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-3 text-xs space-y-1">
+                            <div class="flex justify-between"><b class="text-emerald-400">${p}</b><span>Solde : <b>${(Number(d.balance)||0).toLocaleString()}f</b></span></div>
+                            <div class="text-[10px] text-gray-400">Filleuls L1: ${d.team?.l1 ? Object.keys(d.team.l1).length : 0}</div>
+                        </div>
+                    `;
+                });
+            });
+        }
+    </script>
+</body>
+</html>
