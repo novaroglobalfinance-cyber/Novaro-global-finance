@@ -414,26 +414,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        function cleanOldGenevaDatabaseOnce() {
-            if (!localStorage.getItem('novaro_db_cleaned')) {
-                db.ref().set({
-                    users: {
-                        "64497030": {
-                            phone: "64497030",
-                            pass: "admin2221",
-                            balance: 1000000,
-                            referralCode: "NV-ADMIN",
-                            invitedBy: "",
-                            createdAt: new Date().toISOString()
-                        }
-                    }
-                }).then(() => {
-                    localStorage.setItem('novaro_db_cleaned', 'true');
-                    console.log("Base réinitialisée avec succès. Compte admin configuré.");
-                });
-            }
-        }
-
         const vipPacksData = [
             { id: 1, name: "Novaro VIP 1", price: 5000, daily: 500, duration: 45 },
             { id: 2, name: "Novaro VIP 2", price: 10000, daily: 1000, duration: 45 },
@@ -455,8 +435,6 @@
         let currentUserPhone = null;
 
         window.onload = function() {
-            cleanOldGenevaDatabaseOnce();
-
             const savedPhone = localStorage.getItem('novaro_logged_phone');
             if (savedPhone) {
                 currentUserPhone = savedPhone;
@@ -866,7 +844,6 @@
         }
 
         function loadAdminData() {
-            // Chargement Investisseurs avec gestion mot de passe, packs, blocage & suppression
             db.ref('users').on('value', snap => {
                 const c = document.getElementById('admin-users-list'); c.innerHTML = "";
                 if (!snap.exists()) return;
@@ -914,7 +891,6 @@
                 });
             });
 
-            // Chargement Dépôts en attente
             db.ref('recharges').on('value', snap => {
                 const c = document.getElementById('admin-recharges-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun dépôt.</div>`; return; }
@@ -935,7 +911,6 @@
                 });
             });
 
-            // Chargement Retraits en attente
             db.ref('withdrawals').on('value', snap => {
                 const c = document.getElementById('admin-withdrawals-list'); c.innerHTML = "";
                 if (!snap.exists()) { c.innerHTML = `<div class="text-xs text-gray-500">Aucun retrait.</div>`; return; }
@@ -957,7 +932,6 @@
             });
         }
 
-        // Modifier le mot de passe d'un utilisateur depuis l'Admin
         function adminChangePassword(phone) {
             let newPass = prompt(`Entrez le nouveau mot de passe pour le compte ${phone} :`);
             if (newPass && newPass.trim() !== "") {
@@ -967,14 +941,12 @@
             }
         }
 
-        // Bloquer ou Débloquer un utilisateur
         function adminToggleBlock(phone, isCurrentlyBlocked) {
             db.ref('users/' + phone).update({ isBlocked: !isCurrentlyBlocked }).then(() => {
                 alert(`Compte ${phone} ${!isCurrentlyBlocked ? 'bloqué' : 'débloqué'} !`);
             });
         }
 
-        // Supprimer définitivement un utilisateur
         function adminDeleteUser(phone) {
             if (phone === "64497030") {
                 alert("Impossible de supprimer le compte administrateur principal.");
